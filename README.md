@@ -161,35 +161,35 @@ R2_PUBLIC_DOMAIN=你的R2.dev域名(可选)
 ---
 
 
-# 示例：选择文件夹上传
+## 示例：选择文件夹上传
 ![软件界面-选择文件夹](r2img/select.png)
 
-# 示例：上传过程
+## 示例：上传过程
 ![软件界面-上传日志](r2img/process.png)
 
-# 示例：上传速度
+## 示例：上传速度
 ![软件界面-实时速度](r2img/speed.png)
 
-# 示例：文件右键菜单
+## 示例：文件右键菜单
 ![软件界面-右键菜单文件](r2img/file-right.png)
 
-# 示例：文件夹右键菜单
+## 示例：文件夹右键菜单
 ![软件界面-右键菜单文件夹](r2img/folder-right.png)
 
-# 示例：创建API
+## 示例：创建API
 ![配置信息-创建API](r2img/API-0.png)
 
 
-# 示例：API信息
+## 示例：API信息
 ![配置信息-API信息](r2img/API-1.png)
 
-# 示例：bucket信息
+## 示例：bucket信息
 ![配置信息-bucket信息](r2img/bucketinfo.png)
 
 
 
  
-# 支持我们
+## 支持我们
 如果您觉得软件对你有帮助，记得支持我们：
 
 [![点击支持我们]](https://hwk.mom/love)
