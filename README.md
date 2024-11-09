@@ -70,6 +70,9 @@ R2_PUBLIC_DOMAIN=你的R2.dev域名(可选)
 
 ### 启动程序
 
+````
+python 脚本目录\r2_uploader_gui.py
+````
 
 
 ### 文件上传
