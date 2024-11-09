@@ -151,4 +151,29 @@ R2_PUBLIC_DOMAIN=你的R2.dev域名(可选)
 🔄 会定期自动刷新文件列表和存储容量
 
 
+
+# 示例：选择文件夹上传
+![软件界面-选择文件夹](r2img/select.png)
+
+# 示例：上传过程
+![软件界面-上传日志](r2img/process.png)
+
+# 示例：上传速度
+![软件界面-实时速度](r2img/speed.png)
+
+# 示例：文件右键菜单
+![软件界面-右键菜单文件](r2img/file-right.png)
+
+# 示例：文件夹右键菜单
+![软件界面-右键菜单文件夹](r2img/folder-right.png)
+
+# 示例：创建API
+![配置信息-创建API](r2img/API-0.png)
+
+
+# 示例：API信息
+![配置信息-API信息](r2img/API-1.png)
+
+# 示例：bucket信息
+![配置信息-bucket信息](r2img/bucketinfo.png)
   
