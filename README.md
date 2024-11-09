@@ -37,7 +37,7 @@ CLoudfare R2对象存储文件批量上传工具
 
 ````
 python r2_uploader_gui.py
-
+````
 
 
 ### Cloudflare R2 配置
