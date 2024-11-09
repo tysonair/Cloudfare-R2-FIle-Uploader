@@ -55,7 +55,7 @@ python r2_uploader_gui.py
 1. 在脚本同目录创建 `.env` 文件
 2. 填入以下配置信息：
 
-
+````
 R2_ACCOUNT_ID=你的Account_ID
 R2_ACCESS_KEY_ID=你的Access_Key_ID
 R2_ACCESS_KEY_SECRET=你的Access_Key_Secret
@@ -63,7 +63,7 @@ R2_BUCKET_NAME=你的存储桶名称
 R2_ENDPOINT_URL=你的Endpoint_URL
 R2_CUSTOM_DOMAIN=你的自定义域名(可选)
 R2_PUBLIC_DOMAIN=你的R2.dev域名(可选)
-
+````
 
 
 ## 使用说明
