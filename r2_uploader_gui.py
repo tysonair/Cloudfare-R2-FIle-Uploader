@@ -6,9 +6,10 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                             QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, 
                             QTextEdit, QLineEdit, QMessageBox, QProgressBar,
                             QProgressDialog, QTreeWidget, QTreeWidgetItem, QStyle,
-                            QMenu, QInputDialog, QSizePolicy, QStackedWidget, QListWidget, QListWidgetItem)
+                            QMenu, QInputDialog, QSizePolicy, QStackedWidget, QListWidget, 
+                            QListWidgetItem, QSpinBox)
 from PyQt6.QtCore import Qt, QDateTime, QThread, pyqtSignal, QSize, QObject, QThreadPool
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtGui import QKeySequence, QShortcut, QIcon
 import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from botocore.config import Config
@@ -18,8 +19,244 @@ import csv
 import time
 import math
 
+# 版本号
+VERSION = "v2.0"
+
 # 禁用 SSL 警告
 warnings.filterwarnings('ignore', category=urllib3.exceptions.InsecureRequestWarning)
+
+# ═══════════════════════════════════════════════════════════
+# 深色主题样式表
+# ═══════════════════════════════════════════════════════════
+DARK_STYLESHEET = """
+/* 全局样式 */
+QMainWindow {
+    background: #0D0D0D;
+}
+
+QWidget {
+    background: #0D0D0D;
+    color: #FFFFFF;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+/* 输入框 */
+QLineEdit {
+    background: #2C2C2E;
+    color: #FFFFFF;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    selection-background-color: #E8623A;
+}
+
+QLineEdit:focus {
+    background: #3A3A3C;
+    border: 2px solid #E8623A;
+}
+
+QLineEdit::placeholder {
+    color: #8E8E93;
+}
+
+/* 文本框 */
+QTextEdit {
+    background: #1C1C1E;
+    color: #FFFFFF;
+    border: 1px solid #2C2C2E;
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 13px;
+    selection-background-color: #E8623A;
+}
+
+/* 按钮 */
+QPushButton {
+    background: #E8623A;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background: #FF7A4D;
+}
+
+QPushButton:pressed {
+    background: #C0411E;
+}
+
+QPushButton:disabled {
+    background: #2C2C2E;
+    color: #6E6E73;
+}
+
+/* 进度条 */
+QProgressBar {
+    background: #2C2C2E;
+    border: none;
+    border-radius: 8px;
+    height: 16px;
+    text-align: center;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+QProgressBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #E8623A, stop:1 #FF7A4D);
+    border-radius: 8px;
+}
+
+/* 树形控件 */
+QTreeWidget {
+    background: #1C1C1E;
+    color: #FFFFFF;
+    border: 1px solid #2C2C2E;
+    border-radius: 12px;
+    padding: 8px;
+    font-size: 13px;
+    selection-background-color: #E8623A;
+    selection-color: #FFFFFF;
+    outline: none;
+}
+
+QTreeWidget::item {
+    padding: 8px;
+    border-radius: 8px;
+}
+
+QTreeWidget::item:hover {
+    background: rgba(255,255,255,0.07);
+}
+
+QTreeWidget::item:selected {
+    background: #E8623A;
+}
+
+QHeaderView::section {
+    background: #2C2C2E;
+    color: #8E8E93;
+    border: none;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* 列表控件 */
+QListWidget {
+    background: #1C1C1E;
+    color: #FFFFFF;
+    border: 1px solid #2C2C2E;
+    border-radius: 12px;
+    padding: 8px;
+    font-size: 13px;
+    selection-background-color: #E8623A;
+    outline: none;
+}
+
+QListWidget::item {
+    padding: 8px;
+    border-radius: 8px;
+}
+
+QListWidget::item:hover {
+    background: rgba(255,255,255,0.07);
+}
+
+QListWidget::item:selected {
+    background: #E8623A;
+}
+
+/* 标签 */
+QLabel {
+    color: #FFFFFF;
+    font-size: 13px;
+    background: transparent;
+}
+
+/* 滚动条 */
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background: #3A3A3C;
+    border-radius: 4px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #8E8E93;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+}
+
+QScrollBar:horizontal {
+    background: transparent;
+    height: 8px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #3A3A3C;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #8E8E93;
+}
+
+/* 菜单 */
+QMenu {
+    background: #2C2C2E;
+    color: #FFFFFF;
+    border: 1px solid #3A3A3C;
+    border-radius: 10px;
+    padding: 8px;
+}
+
+QMenu::item {
+    padding: 8px 24px 8px 12px;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background: #E8623A;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #3A3A3C;
+    margin: 4px 8px;
+}
+
+/* 消息框 */
+QMessageBox {
+    background: #1C1C1E;
+}
+
+QMessageBox QLabel {
+    color: #FFFFFF;
+}
+
+QMessageBox QPushButton {
+    min-width: 80px;
+}
+
+/* 进度对话框 */
+QProgressDialog {
+    background: #1C1C1E;
+}
+"""
 
 class UploadThread(QThread):
     progress_updated = pyqtSignal(int)
@@ -248,7 +485,10 @@ class R2UploaderGUI(QMainWindow):
     def init_ui(self):
         """初始化用户界面"""
         self.setWindowTitle('R2 文件上传工具')
-        self.setGeometry(100, 100, 1000, 600)  # 加宽窗口
+        self.setGeometry(100, 100, 1000, 600)
+        
+        # 应用深色主题
+        self.setStyleSheet(DARK_STYLESHEET)
 
         # 创建主窗口部件和布局
         main_widget = QWidget()
