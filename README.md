@@ -50,14 +50,47 @@ CLoudfare R2对象存储文件批量上传工具
 ## 环境准备
 
 ### Python 环境要求
-- Python 3.7+
+- Python 3.8 或更高版本
 - pip 包管理工具
 
-### 安装依赖包
+### 依赖包列表
 
-````
-pip install PyQt6 boto3 python-dotenv urllib3
-````
+本工具需要以下 Python 包：
+
+| 包名 | 版本要求 | 说明 |
+|------|---------|------|
+| PyQt6 | >= 6.0.0 | GUI 框架 |
+| PyQt6-SVG | >= 6.0.0 | SVG 图标支持 |
+| boto3 | >= 1.26.0 | AWS S3/R2 客户端 |
+| python-dotenv | >= 0.19.0 | 环境变量管理 |
+| urllib3 | >= 1.26.0 | HTTP 客户端 |
+
+### 快速安装
+
+#### 方法一：一键安装脚本（推荐）
+
+**Windows:**
+```bash
+install_dependencies.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x install_dependencies.sh
+./install_dependencies.sh
+```
+
+#### 方法二：手动安装
+
+```bash
+pip install -r requirements.txt
+```
+
+#### 方法三：逐个安装
+
+```bash
+pip install PyQt6 PyQt6-SVG boto3 python-dotenv urllib3
+```
 
 
 ### Cloudflare R2 配置
