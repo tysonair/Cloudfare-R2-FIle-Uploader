@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                             QProgressDialog, QTreeWidget, QTreeWidgetItem, QStyle,
                             QMenu, QInputDialog, QSizePolicy, QStackedWidget, QListWidget, 
                             QListWidgetItem, QSpinBox)
-from PyQt6.QtCore import Qt, QDateTime, QThread, pyqtSignal, QSize, QObject, QThreadPool
-from PyQt6.QtGui import QKeySequence, QShortcut, QIcon
+from PyQt6.QtCore import Qt, QDateTime, QThread, pyqtSignal, QSize, QObject, QThreadPool, QByteArray
+from PyQt6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap
 import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from botocore.config import Config
@@ -18,9 +18,33 @@ from PyQt6.QtGui import QClipboard
 import csv
 import time
 import math
+import base64
 
 # 版本号
 VERSION = "v2.0"
+
+# 应用图标 (Base64 编码的 PNG - 云存储主题)
+APP_ICON_BASE64 = """
+iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAD
+Z0lEQVRYhcWXS2wbVRSGv3vHM7bjR+I4TtI0aUKbpqVQHqVABRJCYsECIVasWLBhwQKxQKxYsGTD
+ggUrJBYsEBtALBALhIQQUkFCPEQRtDykbdI2aZM2iePYjj0ez8y9LGYmHtuTxHYW/NJoNHPvPf//
+nHPuuVdUFf+nkv9bABHZBxwGDgL7gTpgG7AJWAJ6gTngJnAVuKKqS/8JgIjUAh8BHwP1m1h+H/gS
++EpVF7cMICL7gW+Bw1tY/jvwqapevWcAEXkZ+B6o2uTaJeAD4JKqmk0BiMhB4Aegdgtr54BTVPVG
+xQAi0gL8BNRsYe0c8K6qXq8IQETqgF+Bti2snQXeUdWZigBE5Avg0y2snQE+VtXvNgQQkRbgN6B6
+C2ungbdVdXpdABF5FvgZqNrC2ingLVWdXBdARD4DPtvC2kngTVWdKAsgIi3Ab0D1FtZOAG+o6nhZ
+ABF5BvgFqNnC2nHgdVUdKwsgIp8Cn29h7RjwmqqOlgQQkWbgd6BmC2tHgVdVdaQkgIg8DfwK1G5h
+7QjwiqoOlwQQkU+AT7awdgh4WVWHigKISBNwHajbwtpB4CVVHSwKICJPA78BdVtYOwC8qKoDRQFE
+5GPgoy2s7QdeUNX+ogAi0gjcAOq3sLYPeF5V+4oCiMiHwIdbWNsLPKeqfUUBRKQBuAnUb2FtD/Cs
+qvYWBRCRD4APtrC2G3hGVXuLAohIPXALaNjC2i7gaVXtKQogIu8D721hbSfwtKp2FwUQkTrgNtC4
+hbUdwFOq2lUUQETeA97dwtp24ElV7SwKUAvcARq3sLYNeEJVO4oCiMi7wDtbWNsKPK6qHUUBaoA7
+QNMW1rYAj6lqe1EAEXkbeGsLa5uBx1S1rSiAA+gC9m5hbRPwqKq2FgUQkbeAN7ewtgF4RFVbigK4
+gG6gZQtrG4BHVLWlKICIvAG8voW19cDDqtpcFMAFdAMtW1hbBzykqs1FAUTkNeC1Lazdj/OgNhUF
+cAE9QPMW1u4DHlTVpqIAIvIq8MoW1u4FHlDVxqIALqAXaNrC2r3AA6raWBRARF4GXtrC2j3A/ara
+UBTABXQD+7awtgd4QFX3FAUQkReBF7awthvYr6p7igK4gB6geQtr7wP2q+ruogAi8jzw3BbWdgH7
+VXVXUQAXcBdo3sLaTmC/qu4sCiAizwLPbGFtB7BfVXcUBXABd4HmLaztAPar6vaiACLyNPDUFta2
+A/tVdVtRABdwB2jewtp2YL+qbisKICJPAk9uYW0bsF9VtxYFcAF3gOYtrG0D9qtqQ1EAEXkCeHwL
+a1uB/araUBTABdwGmrewthXYr6r1RQH+BvwX8z/1L1zrAAAAAElFTkSuQmCC
+"""
 
 # 禁用 SSL 警告
 warnings.filterwarnings('ignore', category=urllib3.exceptions.InsecureRequestWarning)
@@ -533,6 +557,12 @@ class R2UploaderGUI(QMainWindow):
         self.setWindowTitle(f'R2 文件上传工具 {VERSION}')
         self.setGeometry(100, 100, 1000, 600)
         
+        # 设置窗口图标
+        icon_data = base64.b64decode(APP_ICON_BASE64)
+        pixmap = QPixmap()
+        pixmap.loadFromData(QByteArray(icon_data))
+        self.setWindowIcon(QIcon(pixmap))
+        
         # 应用深色主题
         self.setStyleSheet(DARK_STYLESHEET)
 
@@ -550,14 +580,14 @@ class R2UploaderGUI(QMainWindow):
         # 添加文件选择相关控件到左侧面板
         self.file_path_input = QLineEdit()
         self.file_path_input.setPlaceholderText('选择文件或文件夹路径')
-        self.file_path_input.setMinimumHeight(40)  # 增加输入框高度
+        self.file_path_input.setMinimumHeight(36)
         left_layout.addWidget(self.file_path_input)
 
         button_layout = QHBoxLayout()
         browse_file_btn = QPushButton('📄 选择文件')
         browse_folder_btn = QPushButton('📁 选择文件夹')
-        browse_file_btn.setMinimumHeight(40)
-        browse_folder_btn.setMinimumHeight(40)
+        browse_file_btn.setMinimumHeight(36)
+        browse_folder_btn.setMinimumHeight(36)
         browse_file_btn.clicked.connect(self.browse_file)
         browse_folder_btn.clicked.connect(self.browse_folder)
         button_layout.addWidget(browse_file_btn)
@@ -566,7 +596,7 @@ class R2UploaderGUI(QMainWindow):
 
         self.custom_name_input = QLineEdit()
         self.custom_name_input.setPlaceholderText('自定义文件名（可选）')
-        self.custom_name_input.setMinimumHeight(40)
+        self.custom_name_input.setMinimumHeight(36)
         left_layout.addWidget(self.custom_name_input)
 
         # 添加并发线程数设置（使用 QSpinBox）
@@ -576,7 +606,7 @@ class R2UploaderGUI(QMainWindow):
         self.thread_count_input.setMinimum(1)
         self.thread_count_input.setMaximum(50)
         self.thread_count_input.setValue(10)
-        self.thread_count_input.setMinimumHeight(40)
+        self.thread_count_input.setMinimumHeight(36)
         self.thread_count_input.setMaximumWidth(100)
         thread_layout.addWidget(thread_label)
         thread_layout.addWidget(self.thread_count_input)
@@ -584,7 +614,7 @@ class R2UploaderGUI(QMainWindow):
         left_layout.addLayout(thread_layout)
 
         upload_btn = QPushButton('🚀 上传')
-        upload_btn.setMinimumHeight(40)
+        upload_btn.setMinimumHeight(36)
         upload_btn.clicked.connect(self.upload_file)
         left_layout.addWidget(upload_btn)
 
