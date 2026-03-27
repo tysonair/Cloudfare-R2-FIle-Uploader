@@ -7,9 +7,10 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                             QTextEdit, QLineEdit, QMessageBox, QProgressBar,
                             QProgressDialog, QTreeWidget, QTreeWidgetItem, QStyle,
                             QMenu, QInputDialog, QSizePolicy, QStackedWidget, QListWidget, QListWidgetItem)
-from PyQt6.QtCore import Qt, QDateTime, QThread, pyqtSignal, QSize, QObject
+from PyQt6.QtCore import Qt, QDateTime, QThread, pyqtSignal, QSize, QObject, QThreadPool
 from PyQt6.QtGui import QKeySequence, QShortcut
 import boto3
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from botocore.config import Config
 from dotenv import load_dotenv
 from PyQt6.QtGui import QClipboard
@@ -281,6 +282,19 @@ class R2UploaderGUI(QMainWindow):
         self.custom_name_input.setPlaceholderText('自定义文件名（可选）')
         self.custom_name_input.setMinimumHeight(40)  # 增加输入框高度
         left_layout.addWidget(self.custom_name_input)
+
+        # 添加并发线程数设置
+        thread_layout = QHBoxLayout()
+        thread_label = QLabel('并发线程数:')
+        self.thread_count_input = QLineEdit()
+        self.thread_count_input.setText('10')  # 默认10个线程
+        self.thread_count_input.setPlaceholderText('1-50')
+        self.thread_count_input.setMaximumWidth(100)
+        self.thread_count_input.setMinimumHeight(40)
+        thread_layout.addWidget(thread_label)
+        thread_layout.addWidget(self.thread_count_input)
+        thread_layout.addStretch()
+        left_layout.addLayout(thread_layout)
 
         upload_btn = QPushButton('上传')
         upload_btn.setMinimumHeight(40)  # 增加按钮高度
@@ -577,7 +591,7 @@ class R2UploaderGUI(QMainWindow):
             self.custom_name_input.clear()
 
     def _upload_folder(self, folder_path):
-        """上传文件夹"""
+        """上传文件夹 - 并发版本"""
         try:
             self.current_upload_folder = folder_path
             base_folder_name = os.path.basename(folder_path)
@@ -588,85 +602,120 @@ class R2UploaderGUI(QMainWindow):
                 self.show_result('文件夹为空，没有上传的文件', True)
                 return
 
-            self.show_result(f'开始上传文件夹: {folder_path}', False)
+            # 获取用户设置的线程数
+            try:
+                max_workers = int(self.thread_count_input.text())
+                max_workers = max(1, min(50, max_workers))  # 限制在1-50之间
+            except:
+                max_workers = 10  # 默认值
+                self.thread_count_input.setText('10')
+
+            self.show_result(f'开始并发上传文件夹: {folder_path} (并发数: {max_workers})', False)
             uploaded_files = 0
             failed_files = []
 
             self.update_upload_info(self.current_upload_folder, total_files, uploaded_files)
+            self.progress_bar.setValue(0)  # 重置进度条
 
-            for local_path, relative_path in all_files:
-                try:
+            # 使用线程池并发上传
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 提交所有上传任务
+                future_to_file = {}
+                for local_path, relative_path in all_files:
                     r2_key = os.path.join(base_folder_name, relative_path).replace('\\', '/')
-                    file_size = os.path.getsize(local_path)
+                    future = executor.submit(self._upload_single_file_sync, local_path, r2_key)
+                    future_to_file[future] = (local_path, relative_path)
+
+                # 处理完成的任务
+                for future in as_completed(future_to_file):
+                    local_path, relative_path = future_to_file[future]
                     current_file = os.path.basename(local_path)
-
-                    # 显示开始上传当前文件的信息
-                    self.show_result(f'开始上传: {current_file} ({self._format_size(file_size)})', False)
-
-                    # 更新显示信息（不包含速度）
-                    self.update_upload_info(
-                        self.current_upload_folder, 
-                        total_files, 
-                        uploaded_files,
-                        current_file,
-                        file_size
-                    )
-
-                    # 创建并启动上传线程
-                    upload_thread = UploadThread(
-                        self.s3_client,
-                        self.bucket_name,
-                        local_path,
-                        r2_key
-                    )
-
-                    # 使用 lambda 捕获当前文件信息
-                    current_file_info = {
-                        'name': current_file,
-                        'size': file_size
-                    }
                     
-                    # 连接信号
-                    upload_thread.progress_updated.connect(self.progress_bar.setValue)
-                    upload_thread.status_updated.connect(self.show_result)
-                    upload_thread.speed_updated.connect(
-                        lambda speed: self.update_upload_info(
-                            self.current_upload_folder,
-                            total_files,
-                            uploaded_files,
-                            current_file_info['name'],
-                            current_file_info['size'],
-                            speed
-                        )
-                    )
-
-                    # 启动线程并等待完成
-                    upload_thread.start()
-                    while not upload_thread.isFinished():
-                        QApplication.processEvents()
-                        time.sleep(0.1)
-
-                    if upload_thread.isFinished():
-                        uploaded_files += 1
-                        self.show_result(f'✅ 文件上传成功: {current_file}', False)
-                        self.update_upload_info(self.current_upload_folder, total_files, uploaded_files)
-
-                except Exception as e:
-                    error_msg = f'❌ 文件上传失败：{os.path.basename(local_path)} - {str(e)}'
-                    self.show_result(error_msg, True)
-                    failed_files.append((relative_path, str(e)))
-
-                finally:
-                    self.progress_bar.setValue(0)
+                    try:
+                        success, message = future.result()
+                        if success:
+                            uploaded_files += 1
+                            self.show_result(f'✅ 文件上传成功: {current_file}', False)
+                        else:
+                            self.show_result(f'❌ {message}', True)
+                            failed_files.append((relative_path, message))
+                    except Exception as e:
+                        error_msg = f'文件上传失败：{current_file} - {str(e)}'
+                        self.show_result(f'❌ {error_msg}', True)
+                        failed_files.append((relative_path, str(e)))
+                    
+                    # 更新进度（已完成的文件数 / 总文件数）
+                    completed = uploaded_files + len(failed_files)
+                    progress = int(completed / total_files * 100)
+                    self.progress_bar.setValue(progress)
+                    self.update_upload_info(self.current_upload_folder, total_files, uploaded_files)
                     QApplication.processEvents()
 
             # 显示最终上传结果
             self._show_final_results(uploaded_files, total_files, failed_files)
 
         except Exception as e:
-            self.show_result(f'文件夹上���失败：{str(e)}', True)
+            self.show_result(f'文件夹上传失败：{str(e)}', True)
         finally:
             self.progress_bar.setValue(0)
+
+    def _upload_single_file_sync(self, local_path, r2_key):
+        """同步上传单个文件（用于线程池）"""
+        try:
+            file_size = os.path.getsize(local_path)
+            current_file = os.path.basename(local_path)
+            
+            # 显示开始上传
+            self.show_result(f'开始上传: {current_file} ({self._format_size(file_size)})', False)
+            
+            # 小文件直接上传
+            if file_size < 50 * 1024 * 1024:  # 小于50MB
+                self.s3_client.upload_file(
+                    local_path,
+                    self.bucket_name,
+                    r2_key
+                )
+            else:
+                # 大文件分片上传
+                chunk_size = 20 * 1024 * 1024
+                mpu = self.s3_client.create_multipart_upload(
+                    Bucket=self.bucket_name,
+                    Key=r2_key
+                )
+                
+                parts = []
+                with open(local_path, 'rb') as f:
+                    part_number = 1
+                    while True:
+                        data = f.read(chunk_size)
+                        if not data:
+                            break
+                        
+                        response = self.s3_client.upload_part(
+                            Bucket=self.bucket_name,
+                            Key=r2_key,
+                            PartNumber=part_number,
+                            UploadId=mpu['UploadId'],
+                            Body=data
+                        )
+                        
+                        parts.append({
+                            'PartNumber': part_number,
+                            'ETag': response['ETag']
+                        })
+                        part_number += 1
+                
+                self.s3_client.complete_multipart_upload(
+                    Bucket=self.bucket_name,
+                    Key=r2_key,
+                    UploadId=mpu['UploadId'],
+                    MultipartUpload={'Parts': parts}
+                )
+            
+            return True, f'文件上传成功: {current_file}'
+            
+        except Exception as e:
+            return False, f'文件上传失败：{os.path.basename(local_path)} - {str(e)}'
 
     def calculate_bucket_size(self):
         """计算整个桶的总大小"""
