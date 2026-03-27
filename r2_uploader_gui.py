@@ -665,9 +665,6 @@ class R2UploaderGUI(QMainWindow):
             file_size = os.path.getsize(local_path)
             current_file = os.path.basename(local_path)
             
-            # 显示开始上传
-            self.show_result(f'开始上传: {current_file} ({self._format_size(file_size)})', False)
-            
             # 为线程创建独立的 S3 客户端（线程安全）
             thread_s3_client = boto3.client(
                 service_name='s3',
