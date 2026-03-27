@@ -256,6 +256,52 @@ QMessageBox QPushButton {
 QProgressDialog {
     background: #1C1C1E;
 }
+
+/* 数字输入框 (QSpinBox) */
+QSpinBox {
+    background: #2C2C2E;
+    color: #FFFFFF;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    selection-background-color: #E8623A;
+}
+
+QSpinBox:focus {
+    background: #3A3A3C;
+    border: 2px solid #E8623A;
+}
+
+QSpinBox::up-button {
+    background: #3A3A3C;
+    border-top-right-radius: 8px;
+    width: 20px;
+}
+
+QSpinBox::up-button:hover {
+    background: #E8623A;
+}
+
+QSpinBox::down-button {
+    background: #3A3A3C;
+    border-bottom-right-radius: 8px;
+    width: 20px;
+}
+
+QSpinBox::down-button:hover {
+    background: #E8623A;
+}
+
+QSpinBox::up-arrow {
+    width: 10px;
+    height: 10px;
+}
+
+QSpinBox::down-arrow {
+    width: 10px;
+    height: 10px;
+}
 """
 
 class UploadThread(QThread):
@@ -484,7 +530,7 @@ class R2UploaderGUI(QMainWindow):
 
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle('R2 文件上传工具')
+        self.setWindowTitle(f'R2 文件上传工具 {VERSION}')
         self.setGeometry(100, 100, 1000, 600)
         
         # 应用深色主题
@@ -508,10 +554,10 @@ class R2UploaderGUI(QMainWindow):
         left_layout.addWidget(self.file_path_input)
 
         button_layout = QHBoxLayout()
-        browse_file_btn = QPushButton('选择文件')
-        browse_folder_btn = QPushButton('选择文件夹')
-        browse_file_btn.setMinimumHeight(40)  # 增加按钮高度
-        browse_folder_btn.setMinimumHeight(40)  # 增加按钮高度
+        browse_file_btn = QPushButton('📄 选择文件')
+        browse_folder_btn = QPushButton('📁 选择文件夹')
+        browse_file_btn.setMinimumHeight(40)
+        browse_folder_btn.setMinimumHeight(40)
         browse_file_btn.clicked.connect(self.browse_file)
         browse_folder_btn.clicked.connect(self.browse_folder)
         button_layout.addWidget(browse_file_btn)
@@ -520,24 +566,25 @@ class R2UploaderGUI(QMainWindow):
 
         self.custom_name_input = QLineEdit()
         self.custom_name_input.setPlaceholderText('自定义文件名（可选）')
-        self.custom_name_input.setMinimumHeight(40)  # 增加输入框高度
+        self.custom_name_input.setMinimumHeight(40)
         left_layout.addWidget(self.custom_name_input)
 
-        # 添加并发线程数设置
+        # 添加并发线程数设置（使用 QSpinBox）
         thread_layout = QHBoxLayout()
-        thread_label = QLabel('并发线程数:')
-        self.thread_count_input = QLineEdit()
-        self.thread_count_input.setText('10')  # 默认10个线程
-        self.thread_count_input.setPlaceholderText('1-50')
-        self.thread_count_input.setMaximumWidth(100)
+        thread_label = QLabel('⚡ 并发线程数:')
+        self.thread_count_input = QSpinBox()
+        self.thread_count_input.setMinimum(1)
+        self.thread_count_input.setMaximum(50)
+        self.thread_count_input.setValue(10)
         self.thread_count_input.setMinimumHeight(40)
+        self.thread_count_input.setMaximumWidth(100)
         thread_layout.addWidget(thread_label)
         thread_layout.addWidget(self.thread_count_input)
         thread_layout.addStretch()
         left_layout.addLayout(thread_layout)
 
-        upload_btn = QPushButton('上传')
-        upload_btn.setMinimumHeight(40)  # 增加按钮高度
+        upload_btn = QPushButton('🚀 上传')
+        upload_btn.setMinimumHeight(40)
         upload_btn.clicked.connect(self.upload_file)
         left_layout.addWidget(upload_btn)
 
@@ -566,25 +613,21 @@ class R2UploaderGUI(QMainWindow):
 
         # 添加当前路径显示
         path_layout = QHBoxLayout()
-        self.back_button = QPushButton('返回上级')
+        self.back_button = QPushButton('⬅️ 返回上级')
         self.back_button.clicked.connect(self.go_back)
-        self.back_button.setEnabled(False)  # 初始禁用
+        self.back_button.setEnabled(False)
+        self.back_button.setMinimumWidth(120)
         
-        # 设置返回按钮的固定宽度
-        self.back_button.setFixedWidth(80)  # 设置固定宽度为80像素
-        # 或者设置最大宽度
-        # self.back_button.setMaximumWidth(80)
-        
-        self.current_path_label = QLabel('当前路径: /')
+        self.current_path_label = QLabel('📂 当前路径: /')
         path_layout.addWidget(self.back_button)
         path_layout.addWidget(self.current_path_label)
         
         # 修改视图布局，添加之前缺失的按钮
         view_layout = QHBoxLayout()
-        self.list_view_button = QPushButton('列表视图')
-        self.icon_view_button = QPushButton('图标视图') 
-        self.export_urls_button = QPushButton('导出所有文件URL')
-        self.bucket_size_label = QLabel('桶大小: 统计中...')
+        self.list_view_button = QPushButton('📋 列表视图')
+        self.icon_view_button = QPushButton('🖼️ 图标视图') 
+        self.export_urls_button = QPushButton('📤 导出URL')
+        self.bucket_size_label = QLabel('💾 桶大小: 统计中...')
         
         self.list_view_button.clicked.connect(lambda: self.switch_view('list'))
         self.icon_view_button.clicked.connect(lambda: self.switch_view('icon'))
@@ -843,12 +886,7 @@ class R2UploaderGUI(QMainWindow):
                 return
 
             # 获取用户设置的线程数
-            try:
-                max_workers = int(self.thread_count_input.text())
-                max_workers = max(1, min(50, max_workers))  # 限制在1-50之间
-            except:
-                max_workers = 10  # 默认值
-                self.thread_count_input.setText('10')
+            max_workers = self.thread_count_input.value()  # QSpinBox 直接返回 int
 
             self.show_result(f'开始并发上传文件夹: {folder_path} (并发数: {max_workers})', False)
             uploaded_files = 0
