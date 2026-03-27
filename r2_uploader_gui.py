@@ -9,7 +9,9 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                             QMenu, QInputDialog, QSizePolicy, QStackedWidget, QListWidget, 
                             QListWidgetItem, QSpinBox)
 from PyQt6.QtCore import Qt, QDateTime, QThread, pyqtSignal, QSize, QObject, QThreadPool, QByteArray
-from PyQt6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap
+from PyQt6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap, QPainter
+from PyQt6.QtSvgWidgets import QSvgWidget
+from PyQt6.QtSvg import QSvgRenderer
 import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from botocore.config import Config
@@ -18,32 +20,36 @@ from PyQt6.QtGui import QClipboard
 import csv
 import time
 import math
-import base64
+
+# Windows 任务栏图标支持
+if sys.platform == 'win32':
+    import ctypes
+    myappid = 'tysonair.r2uploader.v2.0'  # 应用唯一标识
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 # 版本号
 VERSION = "v2.0"
 
-# 应用图标 (Base64 编码的 PNG - 云存储主题)
-APP_ICON_BASE64 = """
-iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAD
-Z0lEQVRYhcWXS2wbVRSGv3vHM7bjR+I4TtI0aUKbpqVQHqVABRJCYsECIVasWLBhwQKxQKxYsGTD
-ggUrJBYsEBtALBALhIQQUkFCPEQRtDykbdI2aZM2iePYjj0ez8y9LGYmHtuTxHYW/NJoNHPvPf//
-nHPuuVdUFf+nkv9bABHZBxwGDgL7gTpgG7AJWAJ6gTngJnAVuKKqS/8JgIjUAh8BHwP1m1h+H/gS
-+EpVF7cMICL7gW+Bw1tY/jvwqapevWcAEXkZ+B6o2uTaJeAD4JKqmk0BiMhB4Aegdgtr54BTVPVG
-xQAi0gL8BNRsYe0c8K6qXq8IQETqgF+Bti2snQXeUdWZigBE5Avg0y2snQE+VtXvNgQQkRbgN6B6
-C2ungbdVdXpdABF5FvgZqNrC2ingLVWdXBdARD4DPtvC2kngTVWdKAsgIi3Ab0D1FtZOAG+o6nhZ
-ABF5BvgFqNnC2nHgdVUdKwsgIp8Cn29h7RjwmqqOlgQQkWbgd6BmC2tHgVdVdaQkgIg8DfwK1G5h
-7QjwiqoOlwQQkU+AT7awdgh4WVWHigKISBNwHajbwtpB4CVVHSwKICJPA78BdVtYOwC8qKoDRQFE
-5GPgoy2s7QdeUNX+ogAi0gjcAOq3sLYPeF5V+4oCiMiHwIdbWNsLPKeqfUUBRKQBuAnUb2FtD/Cs
-qvYWBRCRD4APtrC2G3hGVXuLAohIPXALaNjC2i7gaVXtKQogIu8D721hbSfwtKp2FwUQkTrgNtC4
-hbUdwFOq2lUUQETeA97dwtp24ElV7SwKUAvcARq3sLYNeEJVO4oCiMi7wDtbWNsKPK6qHUUBaoA7
-QNMW1rYAj6lqe1EAEXkbeGsLa5uBx1S1rSiAA+gC9m5hbRPwqKq2FgUQkbeAN7ewtgF4RFVbigK4
-gG6gZQtrG4BHVLWlKICIvAG8voW19cDDqtpcFMAFdAMtW1hbBzykqs1FAUTkNeC1Lazdj/OgNhUF
-cAE9QPMW1u4DHlTVpqIAIvIq8MoW1u4FHlDVxqIALqAXaNrC2r3AA6raWBRARF4GXtrC2j3A/ara
-UBTABXQD+7awtgd4QFX3FAUQkReBF7awthvYr6p7igK4gB6geQtr7wP2q+ruogAi8jzw3BbWdgH7
-VXVXUQAXcBdo3sLaTmC/qu4sCiAizwLPbGFtB7BfVXcUBXABd4HmLaztAPar6vaiACLyNPDUFta2
-A/tVdVtRABdwB2jewtp2YL+qbisKICJPAk9uYW0bsF9VtxYFcAF3gOYtrG0D9qtqQ1EAEXkCeHwL
-a1uB/araUBTABdwGmrewthXYr6r1RQH+BvwX8z/1L1zrAAAAAElFTkSuQmCC
+# 应用图标 (SVG - 云存储上传图标)
+APP_ICON_SVG = """
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- 云朵背景 -->
+  <path d="M48 28c0-8.837-7.163-16-16-16-6.46 0-12.02 3.83-14.54 9.34C14.68 22.14 12 25.42 12 29.33c0 4.42 3.58 8 8 8h28c4.42 0 8-3.58 8-8 0-3.91-2.68-7.19-6.46-8.33z" 
+        fill="#E8623A" opacity="0.9"/>
+  
+  <!-- 上传箭头 -->
+  <g transform="translate(32, 42)">
+    <!-- 箭头杆 -->
+    <rect x="-2" y="-12" width="4" height="16" fill="#FFFFFF" rx="2"/>
+    
+    <!-- 箭头头部 -->
+    <path d="M-8,-12 L0,-20 L8,-12 Z" fill="#FFFFFF"/>
+  </g>
+  
+  <!-- 装饰圆点 -->
+  <circle cx="20" cy="26" r="2" fill="#FFFFFF" opacity="0.6"/>
+  <circle cx="44" cy="26" r="2" fill="#FFFFFF" opacity="0.6"/>
+</svg>
 """
 
 # 禁用 SSL 警告
@@ -557,10 +563,14 @@ class R2UploaderGUI(QMainWindow):
         self.setWindowTitle(f'R2 文件上传工具 {VERSION}')
         self.setGeometry(100, 100, 1000, 600)
         
-        # 设置窗口图标
-        icon_data = base64.b64decode(APP_ICON_BASE64)
-        pixmap = QPixmap()
-        pixmap.loadFromData(QByteArray(icon_data))
+        # 设置窗口图标 (SVG)
+        svg_bytes = QByteArray(APP_ICON_SVG.encode('utf-8'))
+        renderer = QSvgRenderer(svg_bytes)
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.end()
         self.setWindowIcon(QIcon(pixmap))
         
         # 应用深色主题
