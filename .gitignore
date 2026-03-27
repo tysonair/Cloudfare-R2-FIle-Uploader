@@ -1,3 +1,65 @@
 .env
 __pycache__/
-*.pyc 
+*.pyc # Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node.js
+node_modules/
+.next/
+npm-debug.log*
+yarn-error.log
+.pnpm-debug.log
+.yarn/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+
+# Media files
+*.mp4
+*.mkv
+*.webm
+
+# Design files
+*.psd
+*.ai
+*.sketch
+
+# Archives
+*.zip
+
+# Data directory
+/data
+
+# Config & Env files
+config.json
+.env
+.env.local
+.env.*.local
+.env.production
+
+# OS generated
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Other
+talk.md
+*.part
+*.ytdl
