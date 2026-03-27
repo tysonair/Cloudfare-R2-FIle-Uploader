@@ -660,7 +660,7 @@ class R2UploaderGUI(QMainWindow):
             self.progress_bar.setValue(0)
 
     def _upload_single_file_sync(self, local_path, r2_key):
-        """同步上传单个文件（用于线程池）"""
+        """同步上传单个文件（用于线程池）- 使用独立客户端"""
         try:
             file_size = os.path.getsize(local_path)
             current_file = os.path.basename(local_path)
@@ -668,9 +668,25 @@ class R2UploaderGUI(QMainWindow):
             # 显示开始上传
             self.show_result(f'开始上传: {current_file} ({self._format_size(file_size)})', False)
             
+            # 为线程创建独立的 S3 客户端（线程安全）
+            thread_s3_client = boto3.client(
+                service_name='s3',
+                endpoint_url=self.endpoint_url,
+                aws_access_key_id=self.access_key_id,
+                aws_secret_access_key=self.access_key_secret,
+                config=Config(
+                    signature_version='s3v4',
+                    retries={'max_attempts': 3},
+                    connect_timeout=30,
+                    read_timeout=60
+                ),
+                region_name='auto',
+                verify=False
+            )
+            
             # 小文件直接上传
             if file_size < 50 * 1024 * 1024:  # 小于50MB
-                self.s3_client.upload_file(
+                thread_s3_client.upload_file(
                     local_path,
                     self.bucket_name,
                     r2_key
@@ -678,7 +694,7 @@ class R2UploaderGUI(QMainWindow):
             else:
                 # 大文件分片上传
                 chunk_size = 20 * 1024 * 1024
-                mpu = self.s3_client.create_multipart_upload(
+                mpu = thread_s3_client.create_multipart_upload(
                     Bucket=self.bucket_name,
                     Key=r2_key
                 )
@@ -691,7 +707,7 @@ class R2UploaderGUI(QMainWindow):
                         if not data:
                             break
                         
-                        response = self.s3_client.upload_part(
+                        response = thread_s3_client.upload_part(
                             Bucket=self.bucket_name,
                             Key=r2_key,
                             PartNumber=part_number,
@@ -705,7 +721,7 @@ class R2UploaderGUI(QMainWindow):
                         })
                         part_number += 1
                 
-                self.s3_client.complete_multipart_upload(
+                thread_s3_client.complete_multipart_upload(
                     Bucket=self.bucket_name,
                     Key=r2_key,
                     UploadId=mpu['UploadId'],
@@ -1403,18 +1419,18 @@ class R2UploaderGUI(QMainWindow):
         )
 
     def delete_directory(self, prefix):
-        """删除目录及其所有内容"""
+        """删除目录及其所有内容 - 批量并发版本（带错误处理）"""
         try:
             # 获取目录下所有对象
             paginator = self.s3_client.get_paginator('list_objects_v2')
-            total_objects = 0
-            deleted_objects = 0
+            all_objects = []
             
-            # 首先计算总对象数
+            # 收集所有对象
             for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
                 if 'Contents' in page:
-                    total_objects += len(page['Contents'])
+                    all_objects.extend([{'Key': obj['Key']} for obj in page['Contents']])
             
+            total_objects = len(all_objects)
             if total_objects == 0:
                 self.show_result(f'目录 {prefix} 为空', False)
                 return
@@ -1423,38 +1439,99 @@ class R2UploaderGUI(QMainWindow):
             reply = QMessageBox.question(
                 self,
                 '确认删除',
-                f'确定要删除目录 {prefix} 及其中的 {total_objects} 个文件吗？',
+                f'确定要删除目录 {prefix} 及其中的 {total_objects} 个文件吗？\n\n'
+                f'⚠️ 此操作不可恢复！',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             
             if reply == QMessageBox.StandardButton.Yes:
                 # 创建进度对话框
-                progress = QProgressDialog("正在删除文件...", "取消", 0, total_objects, self)
+                progress = QProgressDialog(
+                    f"正在批量删除文件... (0/{total_objects})", 
+                    "取消", 
+                    0, 
+                    total_objects, 
+                    self
+                )
                 progress.setWindowTitle("删除进度")
                 progress.setWindowModality(Qt.WindowModality.WindowModal)
+                progress.setValue(0)
                 
-                # 删除所有对象
-                for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
-                    if 'Contents' in page:
-                        for obj in page['Contents']:
-                            if progress.wasCanceled():
-                                self.show_result(f'删除操作已取消，已删除 {deleted_objects} 个文件', True)
-                                return
-                                
-                            self.s3_client.delete_object(
-                                Bucket=self.bucket_name,
-                                Key=obj['Key']
-                            )
-                            deleted_objects += 1
-                            progress.setValue(deleted_objects)
-                            
+                deleted_objects = 0
+                failed_objects = []
+                batch_size = 1000  # R2 API 限制：每次最多删除1000个对象
+                
+                # 分批删除
+                for i in range(0, total_objects, batch_size):
+                    if progress.wasCanceled():
+                        self.show_result(
+                            f'⚠️ 删除操作已取消\n'
+                            f'已删除: {deleted_objects}/{total_objects} 个文件\n'
+                            f'失败: {len(failed_objects)} 个',
+                            True
+                        )
+                        return
+                    
+                    batch = all_objects[i:i + batch_size]
+                    batch_count = len(batch)
+                    
+                    try:
+                        # 批量删除
+                        response = self.s3_client.delete_objects(
+                            Bucket=self.bucket_name,
+                            Delete={'Objects': batch, 'Quiet': False}  # Quiet=False 返回详细结果
+                        )
+                        
+                        # 统计成功删除的数量
+                        if 'Deleted' in response:
+                            deleted_objects += len(response['Deleted'])
+                        
+                        # 记录失败的对象
+                        if 'Errors' in response:
+                            for error in response['Errors']:
+                                failed_objects.append({
+                                    'Key': error.get('Key', 'Unknown'),
+                                    'Code': error.get('Code', 'Unknown'),
+                                    'Message': error.get('Message', 'Unknown')
+                                })
+                        
+                    except Exception as e:
+                        # 批次删除失败，记录整个批次
+                        self.show_result(f'⚠️ 批次删除失败: {str(e)}', True)
+                        failed_objects.extend([{'Key': obj['Key'], 'Error': str(e)} for obj in batch])
+                    
+                    # 更新进度
+                    progress.setValue(deleted_objects)
+                    progress.setLabelText(
+                        f"正在批量删除文件... ({deleted_objects}/{total_objects})\n"
+                        f"当前批次: {batch_count} 个文件\n"
+                        f"失败: {len(failed_objects)} 个"
+                    )
+                    QApplication.processEvents()
+                
                 progress.close()
-                self.show_result(f'目录 {prefix} 已删除，共删除 {deleted_objects} 个文件', False)
+                
+                # 显示最终结果
+                if len(failed_objects) == 0:
+                    self.show_result(
+                        f'✅ 目录 {prefix} 已完全删除\n'
+                        f'成功删除: {deleted_objects} 个文件',
+                        False
+                    )
+                else:
+                    self.show_result(
+                        f'⚠️ 目录 {prefix} 部分删除完成\n'
+                        f'成功: {deleted_objects} 个\n'
+                        f'失败: {len(failed_objects)} 个\n'
+                        f'首个失败原因: {failed_objects[0].get("Message", "Unknown")}',
+                        True
+                    )
+                
                 # 刷新文件列表并更新桶大小
                 self.refresh_file_list(self.current_path, calculate_bucket_size=True)
                 
         except Exception as e:
-            self.show_result(f'删除目录失败：{str(e)}', True)
+            self.show_result(f'❌ 删除目录失败：{str(e)}', True)
 
     # 添加新的方法来处理快捷键操作
     def enter_selected_directory(self):
