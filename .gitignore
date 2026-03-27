@@ -63,3 +63,11 @@ desktop.ini
 talk.md
 *.part
 *.ytdl
+
+# 打包相关文件（不同步到 GitHub）
+build_exe.bat
+build_exe.sh
+create_icon.py
+*.spec
+app_icon.ico
+*.exe

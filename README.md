@@ -196,7 +196,6 @@ python 脚本目录\r2_uploader_gui.py
 | `Enter`  | 进入目录 |
 
 
-
 注意事项
 1. 配置安全
 ⚠️ 请妥善保管 .env 文件
